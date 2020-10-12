@@ -35,7 +35,7 @@ namespace Cn.Abp.Cli
             //把参数转成类，容易操作
             var commamdLineArgs = _commandLineArgumentParser.Parser(args);
             //提取命令，
-            var commandType = _commandSelector.Select(commamdLineArgs);
+            var commandType = _commandSelector.Select(commamdLineArgs);//如果转换成类后，没有命令，则默认执行帮助命令
             //根据命令的类型，定位到命令类，传入参数后，执行命令
             using (var scope = _serviceScopeFactory.CreateScope())//服务混合作用域，
             {
