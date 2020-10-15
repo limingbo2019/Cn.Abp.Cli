@@ -53,5 +53,12 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
 
             return sb.ToString();
         }
+
+
+        protected string GetPushCommand()
+        {
+            string test = "dotnet nuget push Cn.Abp.Cli.1.0.0.nupkg -k guang-zhou-nuget-server -s http://10.161.117.131:8888/nuget";
+            return test;//推送格式
+        }
     }
 }
