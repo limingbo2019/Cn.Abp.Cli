@@ -1,4 +1,5 @@
 ﻿using Cn.Abp.Cli.Commands;
+using Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -16,7 +17,7 @@ namespace Cn.Abp.Cli
             {
                 //所有实现的命令都在这里写入命令+命令类型
                 options.Commands["generate-proxy"] = typeof(GenerateProxyCommand);//生成angular的ts代理类Dtos
-
+                options.Commands["package-async"] = typeof(PackageAsyncCommand);//下载包上传到本地nugetserver里面
             });
         }
     }
