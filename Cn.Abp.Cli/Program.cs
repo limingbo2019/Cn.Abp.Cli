@@ -16,8 +16,8 @@ namespace Cn.Abp.Cli
 
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);//注册实例？
             Console.OutputEncoding = System.Text.Encoding.GetEncoding("GB2312");//修改输出的编码
-            Console.WriteLine("欢迎来到山寨轮子的工具条。");
-            Console.WriteLine("English support？");
+            Console.WriteLine("欢迎来到学习（shangzhai)轮子的工具条。");
+            //Console.WriteLine("English support？");
             //配置日志组件Serilog
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Information()
@@ -35,8 +35,7 @@ namespace Cn.Abp.Cli
                 .CreateLogger();//创建日志
 
             //然后通过abp框架，加载模块,引用volo.abp.autofac
-
-
+            
             using (var application = AbpApplicationFactory.Create<CnAbpCliModule>(
                 options =>
                 {

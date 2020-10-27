@@ -3,9 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30523.141
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cn.Abp.Cli", "Cn.Abp.Cli\Cn.Abp.Cli.csproj", "{C7A52ADB-F4B8-49C5-88B4-45E72ACEB7D9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Cn.Abp.Cli", "Cn.Abp.Cli\Cn.Abp.Cli.csproj", "{C7A52ADB-F4B8-49C5-88B4-45E72ACEB7D9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cn.Abp.Cli.Core", "Cn.Abp.Cli.Core\Cn.Abp.Cli.Core.csproj", "{DB385739-E869-49AF-8199-1AC0A16B8C96}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Cn.Abp.Cli.Core", "Cn.Abp.Cli.Core\Cn.Abp.Cli.Core.csproj", "{DB385739-E869-49AF-8199-1AC0A16B8C96}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cn.Abp.Cli.Core.Tests", "Cn.Abp.Cli.Core.Tests\Cn.Abp.Cli.Core.Tests.csproj", "{F2392714-260B-44C8-A45F-2A9B31862E82}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{DB385739-E869-49AF-8199-1AC0A16B8C96}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DB385739-E869-49AF-8199-1AC0A16B8C96}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DB385739-E869-49AF-8199-1AC0A16B8C96}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F2392714-260B-44C8-A45F-2A9B31862E82}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2392714-260B-44C8-A45F-2A9B31862E82}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2392714-260B-44C8-A45F-2A9B31862E82}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2392714-260B-44C8-A45F-2A9B31862E82}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
