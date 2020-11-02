@@ -6,6 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Volo.Abp.Threading;
 using System.Text.Encodings;
 using System.Text;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace Cn.Abp.Cli
 {
@@ -35,7 +37,7 @@ namespace Cn.Abp.Cli
                 .CreateLogger();//创建日志
 
             //然后通过abp框架，加载模块,引用volo.abp.autofac
-            
+            //args = new string[] { "package-async", "-p", "E:\\GDProjects\\GD.Portal.PC.GzMes\\gd.portal.pc.gzmes\\src" };
             using (var application = AbpApplicationFactory.Create<CnAbpCliModule>(
                 options =>
                 {

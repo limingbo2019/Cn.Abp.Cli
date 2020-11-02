@@ -2,11 +2,14 @@
 using Cn.Abp.Cli.Commands;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Xml;
 using Volo.Abp.DependencyInjection;
@@ -31,13 +34,24 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
             rootPath = rootPath ?? Directory.GetCurrentDirectory();
             Logger.LogInformation($"查找文件夹[{rootPath}]");
             var packages = LoadProjectPackages(rootPath);
-            Logger.LogInformation($"准备下载[{packages.Count}]个包。");
-            string sourceUrl = commandLineArgs.Options.GetOrNull(Options.SouceUrl.Short, Options.SouceUrl.Long);
-            sourceUrl = sourceUrl ?? CliUrls.NugetOrg;
-            string saveFolder = commandLineArgs.Options.GetOrNull(Options.DownloadFolder.Short, Options.DownloadFolder.Long);
-            saveFolder = saveFolder ?? Directory.GetCurrentDirectory();
-            DownloadPackages(sourceUrl, saveFolder, packages);
-            Logger.LogInformation("执行下载完毕。");
+
+            string uploadOnly = commandLineArgs.Options.GetOrNull(Options.UploadOnly.Short, Options.UploadOnly.Long);
+            if (string.IsNullOrWhiteSpace(uploadOnly))//需要下载
+            {
+                string sourceUrlVersion = commandLineArgs.Options.GetOrNull(Options.SourceUrlVersion.Short, Options.SourceUrlVersion.Long);
+                sourceUrlVersion = sourceUrlVersion ?? "v3";
+                Logger.LogInformation($"准备下载[{packages.Count}]个包。");
+                string saveFolder = commandLineArgs.Options.GetOrNull(Options.DownloadFolder.Short, Options.DownloadFolder.Long);
+                saveFolder = saveFolder ?? Directory.GetCurrentDirectory();
+                string sourceUrl = GetSourceUrl(sourceUrlVersion);
+                DownloadPackages(sourceUrl, sourceUrlVersion, saveFolder, packages);
+                Logger.LogInformation("执行下载完毕。");
+            }
+            else
+            {
+
+                Logger.LogInformation($"不下载，直接上传[{packages.Count}]个包。");
+            }
             string pushUrl = commandLineArgs.Options.GetOrNull(Options.UploadUrl.Short, Options.UploadUrl.Long);
             string pushKey = commandLineArgs.Options.GetOrNull(Options.UploadKey.Short, Options.UploadKey.Long);
             if (pushUrl.IsNullOrWhiteSpace() || pushKey.IsNullOrWhiteSpace())
@@ -48,6 +62,29 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
             ExcutePushCommand(packages, pushUrl, pushKey);
             Logger.LogInformation("执行上传包完毕。");
             return Task.CompletedTask;
+        }
+
+        private string GetSourceUrl(string sourceUrlVersion)
+        {
+            if (sourceUrlVersion == "v3")
+            {
+                var request = WebRequest.Create(CliUrls.NugetOrg_V3);
+                using (StreamReader streamReader = new StreamReader(request.GetResponse().GetResponseStream(), Encoding.UTF8))
+                {
+                    string json = streamReader.ReadToEnd();
+                    json = json.Replace("@id", "id");
+                    json = json.Replace("@type", "type");
+                    json = json.Replace("@context", "context");
+                    json = json.Replace("@vocab", "vocab");
+                    var nugetV3 = JsonConvert.DeserializeObject<NugetV3>(json);
+                    var packageBase = nugetV3.resources.Where(p => p.type == "PackageBaseAddress/" + nugetV3.version).FirstOrDefault();
+                    return packageBase.id;
+                }
+            }
+            else
+            {
+                return CliUrls.NugetOrg_V2;
+            }
         }
 
         /// <summary>
@@ -84,10 +121,11 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
             sb.AppendLine("");
             sb.AppendLine("选项（Options）:");
             sb.AppendLine("");
-            sb.AppendLine("-s|--sourceUrl <source-url>               (默认: nuget.org)");
-            sb.AppendLine("-d|--downloadFolder <download-folder>     (默认下载到:当前目录)");
-            sb.AppendLine("-k|--uploadKey <key>                      (默认上传key:无)");
-            sb.AppendLine("-u|--uploadUrl <upload-url>               (默认上传至:无)");
+            sb.AppendLine("-v|--sourceUrlVersion <source-url-version>               (默认: v3版本)");
+            sb.AppendLine("-d|--downloadFolder <download-folder>                    (默认下载到:当前目录)");
+            sb.AppendLine("-k|--uploadKey <key>                                     (默认上传key:无)");
+            sb.AppendLine("-u|--uploadUrl <upload-url>                              (默认上传至:无)");
+            sb.AppendLine("-o|--uploadOnly <upload-only>                            (默认:无，仅上传)");
             sb.AppendLine("");
             sb.AppendLine("示例:");
             sb.AppendLine("");
@@ -142,7 +180,7 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
             return lstPackage;
         }
 
-        protected void DownloadPackages(string sourceApiUrl, string saveFolder, List<NugetPackage> packages)
+        protected void DownloadPackages(string sourceApiUrl, string sourceUrlVersion, string saveFolder, List<NugetPackage> packages)
         {
             if (!Directory.Exists(saveFolder))
             {
@@ -161,7 +199,7 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
                         Logger.LogInformation($"包[{p.SaveFullPath}]已经存在，将跳过。");
                         continue;
                     }
-                    p.SetDownloadPath(sourceApiUrl);
+                    p.SetDownloadPath(sourceApiUrl, sourceUrlVersion);
                     Logger.LogInformation($"将下载[{p.DownloadFullPath}]");
                     client.DownloadFile(p.DownloadFullPath, p.SaveFullPath);
                     Logger.LogInformation($"下载完成[{p.FileName}]");
@@ -178,13 +216,14 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
         /// </summary>
         public static class Options
         {
+
             /// <summary>
-            /// 源url
+            /// 包源版本
             /// </summary>
-            public static class SouceUrl
+            public static class SourceUrlVersion
             {
-                public const string Short = "s";
-                public const string Long = "sourceUrl";
+                public const string Short = "v";
+                public const string Long = "sourceUrlVersion";
             }
             /// <summary>
             /// 项目根目录
@@ -210,10 +249,21 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
                 public const string Short = "u";
                 public const string Long = "uploadUrl";
             }
+            /// <summary>
+            /// 上传使用的api
+            /// </summary>
             public static class UploadKey
             {
                 public const string Short = "k";
                 public const string Long = "key";
+            }
+            /// <summary>
+            /// 只上传，不下载，非空即为真
+            /// </summary>
+            public static class UploadOnly
+            {
+                public const string Short = "o";
+                public const string Long = "uploadOnly";
             }
         }
     }
@@ -237,11 +287,21 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
         /// </summary>
         /// <param name="source"></param>
         /// <returns></returns>
-        public void SetDownloadPath(string source)
+        public void SetDownloadPath(string source, string sourceVersion = "v2")
         {
-            source = source.EnsureEndsWith('/');
-            string fullUrl = string.Concat(source, Name, "/", Version);
-            this.DownloadFullPath = fullUrl;
+            if (sourceVersion == "v2")
+            {
+                source = source.EnsureEndsWith('/');
+                string fullUrl = string.Concat(source, Name, "/", Version);
+                this.DownloadFullPath = fullUrl;
+            }
+            else if (sourceVersion == "v3")
+            {
+                //https://api.nuget.org/v3-flatcontainer/{包名}/{版本号}/{包名}.{版本号}.nupkg
+                source = source.EnsureEndsWith('/');
+                string fullUrl = string.Concat(source, Name, "/", Version, "/", Name, ".", Version, ".nupkg").ToLower();
+                this.DownloadFullPath = fullUrl;
+            }
         }
         public string DownloadFullPath { get; protected set; }
         /// <summary>
@@ -253,4 +313,51 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
         /// </summary>
         public string SaveFullPath { get; set; }
     }
+
+
+    #region nuget v3 json class
+    public class ResourcesItem
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        public string id { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public string type { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public string comment { get; set; }
+    }
+
+    public class context
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        public string vocab { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public string comment { get; set; }
+    }
+
+    public class NugetV3
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        public string version { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public List<ResourcesItem> resources { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public context context { get; set; }
+    }
+    #endregion
 }
