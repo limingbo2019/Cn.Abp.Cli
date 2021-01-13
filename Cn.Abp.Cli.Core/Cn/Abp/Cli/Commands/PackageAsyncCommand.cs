@@ -13,6 +13,9 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Xml;
 using Volo.Abp.DependencyInjection;
+using ICSharpCode.SharpZipLib.Core;
+using ICSharpCode.SharpZipLib.Zip;
+using System.Xml.Linq;
 
 namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
 {
@@ -45,17 +48,16 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
                 string sourceUrlVersion = commandLineArgs.Options.GetOrNull(Options.SourceUrlVersion.Short, Options.SourceUrlVersion.Long);
                 sourceUrlVersion = sourceUrlVersion ?? "v3";
                 Logger.LogInformation($"准备下载[{packages.Count}]个包。");
-
                 string sourceUrl = GetSourceUrl(sourceUrlVersion);
                 DownloadPackages(sourceUrl, sourceUrlVersion, saveFolder, packages);
                 Logger.LogInformation("执行下载完毕。");
             }
             else
             {
-                //在下载文件夹里面找包上传
-                packages = LoadDownloadFolderPackages(saveFolder);
+                packages = LoadDownloadFolderPackages(saveFolder);//只上传文件
                 Logger.LogInformation($"准备直接上传[{packages.Count}]个包。");
             }
+
             string pushUrl = commandLineArgs.Options.GetOrNull(Options.UploadUrl.Short, Options.UploadUrl.Long);
             string pushKey = commandLineArgs.Options.GetOrNull(Options.UploadKey.Short, Options.UploadKey.Long);
             if (pushUrl.IsNullOrWhiteSpace() || pushKey.IsNullOrWhiteSpace())
@@ -67,6 +69,59 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
             Logger.LogInformation("执行上传包完毕。");
             return Task.CompletedTask;
         }
+
+        private List<NugetPackage> CheckDependencies(string fileFullPath)
+        {
+            List<NugetPackage> dependenciesPackages = new List<NugetPackage>();
+            if (!File.Exists(fileFullPath))
+            {
+                Logger.LogInformation($"查看包{fileFullPath}失败，文件不存在！");
+                return dependenciesPackages;
+            }
+
+            using (ZipInputStream s = new ZipInputStream(File.OpenRead(fileFullPath)))
+            {
+                ZipEntry theEntry;
+                while ((theEntry = s.GetNextEntry()) != null)
+                {
+                    if (theEntry.Name.EndsWith(".nuspec"))
+                    {
+                        var xDoc = XDocument.Load(s);
+                        var xElements = xDoc.Root.Elements().FirstOrDefault().Elements();
+                        //packageName = xElements.FirstOrDefault(p => p.Name.LocalName == "id").Value;
+                        //packageVersion = xElements.FirstOrDefault(p => p.Name.LocalName == "version").Value;
+                        var dep_root = xElements.FirstOrDefault(p => p.Name.LocalName == "dependencies");
+                        if (dep_root != null)
+                        {
+                            var _dependencies = dep_root.Elements();
+
+                            foreach (var _depackage in _dependencies.Elements())
+                            {
+                                string id = _depackage.Attribute("id").Value;
+                                string version = _depackage.Attribute("version").Value.TrimStart('[').TrimEnd(',', ' ', ')');
+                                //下载
+                                Logger.LogInformation($"需要下载依赖包{id}版本{version}");
+                                NugetPackage package = new NugetPackage();
+                                package.Name = id;
+                                package.Version = version;
+                                dependenciesPackages.Add(package);
+                            }
+                        }
+                        else
+                        {
+                            Logger.LogInformation($"无依赖包...");
+                        }
+                    }
+                }
+
+                // Close can be ommitted as the using statement will do it automatically
+                // but leaving it here reminds you that is should be done.
+                s.Close();
+            }
+
+            return dependenciesPackages;
+        }
+
         /// <summary>
         /// 读取已经存在的包
         /// 例如NUGET的缓存
@@ -78,14 +133,12 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
         private List<NugetPackage> LoadDownloadFolderPackages(string saveFolder)
         {
             List<NugetPackage> lstPackage = new List<NugetPackage>();
-
             if (!Directory.Exists(saveFolder))
             {
                 Logger.LogInformation($"文件夹{saveFolder}不存在..请检查！");
                 return lstPackage;
             }
             DirectoryInfo directory = new DirectoryInfo(saveFolder);
-
             var files = directory.GetFiles("*.nupkg", SearchOption.AllDirectories);
             foreach (var f in files)
             {
@@ -247,6 +300,7 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
                     Logger.LogInformation($"将下载[{p.DownloadFullPath}]");
                     client.DownloadFile(p.DownloadFullPath, p.SaveFullPath);
                     Logger.LogInformation($"下载完成[{p.FileName}]");
+                    DownloadPackages(sourceApiUrl, sourceUrlVersion, saveFolder, CheckDependencies(p.SaveFullPath));
                 }
                 catch (Exception er)
                 {
