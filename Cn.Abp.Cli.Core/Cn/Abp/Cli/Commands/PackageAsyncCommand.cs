@@ -30,27 +30,31 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
         }
         public Task ExcuteAsync(CommandLineArgs commandLineArgs)
         {
-            string rootPath = commandLineArgs.Options.GetOrNull(Options.Project.Short, Options.Project.Long);
-            rootPath = rootPath ?? Directory.GetCurrentDirectory();
-            Logger.LogInformation($"查找文件夹[{rootPath}]");
-            var packages = LoadProjectPackages(rootPath);
+            string saveFolder = commandLineArgs.Options.GetOrNull(Options.DownloadFolder.Short, Options.DownloadFolder.Long);
+            saveFolder = saveFolder ?? Directory.GetCurrentDirectory();
+
+            List<NugetPackage> packages;
 
             string uploadOnly = commandLineArgs.Options.GetOrNull(Options.UploadOnly.Short, Options.UploadOnly.Long);
-            if (string.IsNullOrWhiteSpace(uploadOnly))//需要下载
-            {
+            if (string.IsNullOrWhiteSpace(uploadOnly))//需要下载,通过加载项目的包列表下载
+            {//TODO缺少依赖包的下载
+                string rootPath = commandLineArgs.Options.GetOrNull(Options.Project.Short, Options.Project.Long);
+                rootPath = rootPath ?? Directory.GetCurrentDirectory();
+                Logger.LogInformation($"查找文件夹[{rootPath}]");
+                packages = LoadProjectPackages(rootPath);
                 string sourceUrlVersion = commandLineArgs.Options.GetOrNull(Options.SourceUrlVersion.Short, Options.SourceUrlVersion.Long);
                 sourceUrlVersion = sourceUrlVersion ?? "v3";
                 Logger.LogInformation($"准备下载[{packages.Count}]个包。");
-                string saveFolder = commandLineArgs.Options.GetOrNull(Options.DownloadFolder.Short, Options.DownloadFolder.Long);
-                saveFolder = saveFolder ?? Directory.GetCurrentDirectory();
+
                 string sourceUrl = GetSourceUrl(sourceUrlVersion);
                 DownloadPackages(sourceUrl, sourceUrlVersion, saveFolder, packages);
                 Logger.LogInformation("执行下载完毕。");
             }
             else
             {
-
-                Logger.LogInformation($"不下载，直接上传[{packages.Count}]个包。");
+                //在下载文件夹里面找包上传
+                packages = LoadDownloadFolderPackages(saveFolder);
+                Logger.LogInformation($"准备直接上传[{packages.Count}]个包。");
             }
             string pushUrl = commandLineArgs.Options.GetOrNull(Options.UploadUrl.Short, Options.UploadUrl.Long);
             string pushKey = commandLineArgs.Options.GetOrNull(Options.UploadKey.Short, Options.UploadKey.Long);
@@ -62,6 +66,36 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
             ExcutePushCommand(packages, pushUrl, pushKey);
             Logger.LogInformation("执行上传包完毕。");
             return Task.CompletedTask;
+        }
+        /// <summary>
+        /// 读取已经存在的包
+        /// 例如NUGET的缓存
+        /// Windows：%userprofile%\.nuget\packages
+        /// Mac/Linux：~/.nuget/packages
+        /// </summary>
+        /// <param name="saveFolder">读取根文件夹</param>
+        /// <returns></returns>
+        private List<NugetPackage> LoadDownloadFolderPackages(string saveFolder)
+        {
+            List<NugetPackage> lstPackage = new List<NugetPackage>();
+
+            if (!Directory.Exists(saveFolder))
+            {
+                Logger.LogInformation($"文件夹{saveFolder}不存在..请检查！");
+                return lstPackage;
+            }
+            DirectoryInfo directory = new DirectoryInfo(saveFolder);
+
+            var files = directory.GetFiles("*.nupkg", SearchOption.AllDirectories);
+            foreach (var f in files)
+            {
+                NugetPackage package = new NugetPackage();
+                package.SaveFullPath = f.FullName;
+                package.Name = f.Name;
+                lstPackage.Add(package);
+            }
+
+            return lstPackage;
         }
 
         private string GetSourceUrl(string sourceUrlVersion)
@@ -93,9 +127,13 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
         /// <param name="packages"></param>
         private void ExcutePushCommand(List<NugetPackage> packages, string pushUrl, string pushKey)
         {
+            int countTotal = packages.Count;
+            int cur = 0;
             foreach (var p in packages)
             {
+                Logger.LogInformation($"[{cur}/{countTotal}]准备上传包{p.SaveFullPath}");
                 PushCommand(p.SaveFullPath, pushUrl, pushKey);
+                cur++;
             }
         }
         /// <summary>
@@ -144,7 +182,7 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
         /// <param name="pushKey"></param>
         protected void PushCommand(string packageFullPath, string pushUrl, string pushKey)
         {
-            string pushArguments = $" nuget push {packageFullPath} -k {pushKey} -s {pushUrl}";
+            string pushArguments = $" nuget push {packageFullPath} -k {pushKey} -s {pushUrl} --skip-duplicate";// --skip-duplicate 存在则跳过
             var processStartInfo = new System.Diagnostics.ProcessStartInfo("dotnet", pushArguments);
             System.Diagnostics.Process.Start(processStartInfo)?.WaitForExit();
         }
@@ -179,7 +217,13 @@ namespace Cn.Abp.Cli.Core.Cn.Abp.Cli.Commands
 
             return lstPackage;
         }
-
+        /// <summary>
+        /// 下载包
+        /// </summary>
+        /// <param name="sourceApiUrl"></param>
+        /// <param name="sourceUrlVersion"></param>
+        /// <param name="saveFolder"></param>
+        /// <param name="packages"></param>
         protected void DownloadPackages(string sourceApiUrl, string sourceUrlVersion, string saveFolder, List<NugetPackage> packages)
         {
             if (!Directory.Exists(saveFolder))

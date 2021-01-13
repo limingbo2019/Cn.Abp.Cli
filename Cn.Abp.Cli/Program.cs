@@ -37,7 +37,7 @@ namespace Cn.Abp.Cli
                 .CreateLogger();//创建日志
 
             //然后通过abp框架，加载模块,引用volo.abp.autofac
-            //args = new string[] { "package-async", "-p", "E:\\GDProjects\\GD.Portal.PC.GzMes\\gd.portal.pc.gzmes\\src" };
+            //args = new string[] { "package-async", "-p", "E:\\GDProjects\\GD.Portal.PC.GzMes\\gd.portal.pc.gzmes\\src", "-o","y", "-d", "C:\\Users\\user\\.nuget\\packages" };
             using (var application = AbpApplicationFactory.Create<CnAbpCliModule>(
                 options =>
                 {
